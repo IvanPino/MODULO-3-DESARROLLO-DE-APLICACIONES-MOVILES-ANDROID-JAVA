@@ -1,0 +1,236 @@
+package androidx.fragment.app;
+
+import static androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult;
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP_PREFIX;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentSender;
+import android.content.res.Configuration;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Parcelable;
+import android.util.AttributeSet;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.Window;
+
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedDispatcher;
+import androidx.activity.OnBackPressedDispatcherOwner;
+import androidx.activity.contextaware.OnContextAvailableListener;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultRegistry;
+import androidx.activity.result.ActivityResultRegistryOwner;
+import androidx.activity.result.contract.ActivityResultContract;
+import androidx.annotation.CallSuper;
+import androidx.annotation.ContentView;
+import androidx.annotation.LayoutRes;
+import androidx.annotation.MainThread;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.SharedElementCallback;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LifecycleRegistry;
+import androidx.lifecycle.ViewModelStore;
+import androidx.lifecycle.ViewModelStoreOwner;
+import androidx.loader.app.LoaderManager;
+import androidx.savedstate.SavedStateRegistry;
+
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
+import java.util.Collection;
+
+/**
+ * Base class for activities that want to use the support-based
+ * {@link Fragment Fragments}.
+ *
+ * <p>Known limitations:</p>
+ * <ul>
+ * <li> <p>When using the <code>&lt;fragment></code> tag, this implementation can not
+ * use the parent view's ID as the new fragment's ID.  You must explicitly
+ * specify an ID (or tag) in the <code>&lt;fragment></code>.</p>
+ * </ul>
+ */
+public class FragmentActivity extends ComponentActivity implements
+        ActivityCompat.OnRequestPermissionsResultCallback,
+        ActivityCompat.RequestPermissionsRequestCodeValidator {
+
+    static final String FRAGMENTS_TAG = "android:support:fragments";
+
+    final FragmentController mFragments = FragmentController.createController(new HostCallbacks());
+    /**
+     * A {@link Lifecycle} that is exactly nested outside of when the FragmentController
+     * has its state changed, providing the proper nesting of Lifecycle callbacks
+     * <p>
+     * TODO(b/127528777) Drive Fragment Lifecycle with LifecycleObserver
+     */
+    final LifecycleRegistry mFragmentLifecycleRegistry = new LifecycleRegistry(this);
+
+    boolean mCreated;
+    boolean mResumed;
+    boolean mStopped = true;
+
+    /**
+     * Default constructor for FragmentActivity. All Activities must have a default constructor
+     * for API 27 and lower devices or when using the default
+     * {@link android.app.AppComponentFactory}.
+     */
+    public FragmentActivity() {
+        super();
+        init();
+    }
+
+    /**
+     * Alternate constructor that can be used to provide a default layout
+     * that will be inflated as part of <code>super.onCreate(savedInstanceState)</code>.
+     *
+     * <p>This should generally be called from your constructor that takes no parameters,
+     * as is required for API 27 and lower or when using the default
+     * {@link android.app.AppComponentFactory}.
+     *
+     * @see #FragmentActivity()
+     */
+    @ContentView
+    public FragmentActivity(@LayoutRes int contentLayoutId) {
+        super(contentLayoutId);
+        init();
+    }
+
+    private void init() {
+        // TODO: Directly connect FragmentManager to SavedStateRegistry
+        getSavedStateRegistry().registerSavedStateProvider(FRAGMENTS_TAG,
+                new SavedStateRegistry.SavedStateProvider() {
+                    @NonNull
+                    @Override
+                    public Bundle saveState() {
+                        Bundle outState = new Bundle();
+                        markFragmentsCreated();
+                        mFragmentLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
+                        Parcelable p = mFragments.saveAllState();
+                        if (p != null) {
+                            outState.putParcelable(FRAGMENTS_TAG, p);
+                        }
+                        return outState;
+                    }
+                });
+        addOnContextAvailableListener(new OnContextAvailableListener() {
+            @Override
+            public void onContextAvailable(@NonNull Context context) {
+                mFragments.attachHost(null /*parent*/);
+                Bundle savedInstanceState = getSavedStateRegistry()
+                        .consumeRestoredStateForKey(FRAGMENTS_TAG);
+
+                if (savedInstanceState != null) {
+                    Parcelable p = savedInstanceState.getParcelable(FRAGMENTS_TAG);
+                    mFragments.restoreSaveState(p);
+                }
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------------
+    // HOOKS INTO ACTIVITY
+    // ------------------------------------------------------------------------
+
+    @SuppressWarnings("deprecation")
+    @Override
+    @CallSuper
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        mFragments.noteStateNotSaved();
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+
+    /**
+     * Reverses the Activity Scene entry Transition and triggers the calling Activity
+     * to reverse its exit Transition. When the exit Transition completes,
+     * {@link #finish()} is called. If no entry Transition was used, finish() is called
+     * immediately and the Activity exit Transition is run.
+     *
+     * <p>On Android 4.4 or lower, this method only finishes the Activity with no
+     * special exit transition.</p>
+     */
+    public void supportFinishAfterTransition() {
+        ActivityCompat.finishAfterTransition(this);
+    }
+
+    /**
+     * When {@link android.app.ActivityOptions#makeSceneTransitionAnimation(Activity,
+     * android.view.View, String)} was used to start an Activity, <var>callback</var>
+     * will be called to handle shared elements on the <i>launched</i> Activity. This requires
+     * {@link Window#FEATURE_CONTENT_TRANSITIONS}.
+     *
+     * @param callback Used to manipulate shared element transitions on the launched Activity.
+     */
+    public void setEnterSharedElementCallback(@Nullable SharedElementCallback callback) {
+        ActivityCompat.setEnterSharedElementCallback(this, callback);
+    }
+
+    /**
+     * When {@link android.app.ActivityOptions#makeSceneTransitionAnimation(Activity,
+     * android.view.View, String)} was used to start an Activity, <var>listener</var>
+     * will be called to handle shared elements on the <i>launching</i> Activity. Most
+     * calls will only come when returning from the started Activity.
+     * This requires {@link Window#FEATURE_CONTENT_TRANSITIONS}.
+     *
+     * @param listener Used to manipulate shared element transitions on the launching Activity.
+     */
+    public void setExitSharedElementCallback(@Nullable SharedElementCallback listener) {
+        ActivityCompat.setExitSharedElementCallback(this, listener);
+    }
+
+    /**
+     * Support library version of {@link android.app.Activity#postponeEnterTransition()} that works
+     * only on API 21 and later.
+     */
+    public void supportPostponeEnterTransition() {
+        ActivityCompat.postponeEnterTransition(this);
+    }
+
+    /**
+     * Support library version of {@link android.app.Activity#startPostponedEnterTransition()}
+     * that only works with API 21 and later.
+     */
+    public void supportStartPostponedEnterTransition() {
+        ActivityCompat.startPostponedEnterTransition(this);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p><strong>Note:</strong> If you override this method you must call
+     * <code>super.onMultiWindowModeChanged</code> to correctly dispatch the event
+     * to support fragments attached to this activity.</p>
+     *
+     * @param isInMultiWindowMode True if the activity is in multi-window mode.
+     */
+    @SuppressWarnings("deprecation")
+    @Override
+    @CallSuper
+    public void onMultiWindowModeChanged(boolean isInMultiWindowMode) {
+        mFragments.dispatchMultiWindowModeChanged(isInMultiWindowMode);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p><strong>Note:</strong> If you override this method you must call
+     * <code>super.onPictureInPictureModeChanged</code> to correctly dispatch the event
+     * to support fragments attached to this activity.</p>
+     *
+     * @param isInPictureInPictureMode True if the activity is in picture-in-picture mode.
+     */
+    @SuppressWarnings("deprecation")
+    @Override
+    @CallSuper
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
+        mFragments.dispatchPictureInPictureModeChanged(isInPictureInPictureMode);
+    }

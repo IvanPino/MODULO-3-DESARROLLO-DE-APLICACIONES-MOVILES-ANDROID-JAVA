@@ -1,0 +1,17 @@
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+Actividad Jueves:
+1. Se enlaza Android Studio con Github
+2. Creación de ramas, pull request en Github
+3. Se revisan las activities y su correcto funcionamiento
+4. Afinación de detalles estéticos y revisión de la pauta de evaluación
+
+Link de repositorio de Github:
+https://github.com/IvanPino/RayoSimVerFinal
+
+Para descargar APK:
+https://github.com/IvanPino/RayoSimVerFinal/tree/master/DESCARGAS
+
+*Se adjunta el Apk, las carpetas en conjunto pesan más de 10mb

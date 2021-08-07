@@ -1,0 +1,14 @@
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+**********************************************************************************
+Avances del proyecto:
+1. Nuevos layouts: Se utilizó canva.com para crear las imágenes
+2. Pantalla principal tendrá imágenes distintas para portrait y landscape
+3. Para el resto de las pantallas solo se agregarán unas imágenes para el título,
+borde inferior derecho y el logo.
+4. Los botones de main están listos, se crearon otras activities
+27/05
+5. Borré layouts y creé activities (había creado primero los layouts)
+6. El primer botón que conecta activity_main y la clase IngresoOperador está listo!
+(la primera conección costó, luego solo será copiar y pegar)

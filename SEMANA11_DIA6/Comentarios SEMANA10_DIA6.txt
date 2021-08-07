@@ -1,0 +1,22 @@
+**********************************************************************************
+**********************************************************************************
+SEMANA 11_DIA6
+**********************************************************************************
+**********************************************************************************
+ACTIVIDAD N°1: Investigación de uso Android Studio (Layouts)
+ACTIVIDAD N°2: Activities en Android
+
+Fuentes:
+12 Tipos de Layouts - Tutorial Programación Android
+https://www.youtube.com/watch?v=5tfEAKi38DA
+
+Introducción a Android Studio
+https://developer.android.com/studio/intro?hl=es-419
+
+Android Studio #1 : Primeros pasos para crear una aplicación móvil.
+https://youtu.be/5vV5VdeK_kg
+
+Qué es una Activity 📱 en Android
+https://www.youtube.com/watch?v=NBTEAEoJbTk
+
+
